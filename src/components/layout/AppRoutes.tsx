@@ -2,11 +2,14 @@ import { SettingsView } from '../../features/auth/SettingsView';
 import { LineView } from '../../features/lines/LineView';
 import { HomeView } from '../../features/repair-orders/HomeView';
 import { ROView } from '../../features/repair-orders/ROView';
-import { useAppChrome } from '../../hooks/useAppChrome';
-import { useCurrentLineState } from '../../hooks/useCurrentLineState';
-import { useRepairOrderActions } from '../../hooks/useRepairOrderActions';
-import { useRepairOrderSelectors } from '../../hooks/useRepairOrderSelectors';
+import { useActiveLine } from '../../hooks/useActiveLine';
+import { useActiveRepairOrder } from '../../hooks/useActiveRepairOrder';
+import { useLineAuditState } from '../../hooks/useLineAuditState';
+import { useOcrState } from '../../hooks/useOcrState';
+import { useRepairOrderSearch } from '../../hooks/useRepairOrderSearch';
 import { useRequireApiKey } from '../../hooks/useRequireApiKey';
+import { useStoryWorkflow } from '../../hooks/useStoryWorkflow';
+import * as repairOrderService from '../../services/repair-order.service';
 import { useAuthStore } from '../../store/authStore';
 import type { AppView } from '../../types';
 
@@ -18,11 +21,15 @@ export function AppRoutes({ view }: AppRoutesProps) {
   const requireApiKey = useRequireApiKey();
   const hasApiKey = useAuthStore((s) => !!s.apiKey);
 
-  const { ocr, story } = useAppChrome();
-  const { searchTerm, setSearchTerm, currentRO, pendingROImages, setPendingROImages, filteredROs } =
-    useRepairOrderSelectors();
-  const { currentLine, storyQuality, storyReview, storyQualityStale } = useCurrentLineState();
-  const { home, ro, line, settings } = useRepairOrderActions();
+  const { isProcessingOCR, ocrProgress } = useOcrState();
+  const { isGenerating, isReviewing } = useStoryWorkflow();
+  const { searchTerm, setSearchTerm, filteredROs } = useRepairOrderSearch();
+  const { currentRO, pendingROImages, setPendingROImages } = useActiveRepairOrder();
+  const currentLine = useActiveLine();
+  const { storyQuality, storyReview, storyQualityStale } = useLineAuditState(
+    currentLine?.id,
+    currentLine?.warrantyStory
+  );
 
   switch (view) {
     case 'home':
@@ -31,17 +38,17 @@ export function AppRoutes({ view }: AppRoutesProps) {
           filteredROs={filteredROs}
           searchTerm={searchTerm}
           pendingROImages={pendingROImages}
-          isProcessingOCR={ocr.isProcessingOCR}
-          ocrProgress={ocr.ocrProgress}
+          isProcessingOCR={isProcessingOCR}
+          ocrProgress={ocrProgress}
           onSearchChange={setSearchTerm}
-          onAddROPhoto={home.addROPhoto}
-          onCreateManualRO={home.createManualRO}
+          onAddROPhoto={repairOrderService.addROPhotoPicker}
+          onCreateManualRO={() => void repairOrderService.createManualRO()}
           onClearPending={() => setPendingROImages([])}
           onRemovePending={(idx) => setPendingROImages((prev) => prev.filter((_, i) => i !== idx))}
-          onProcessPending={home.processPending}
-          onOpenRO={home.openRO}
-          onDeleteRO={home.deleteRO}
-          onOpenSettings={home.openSettings}
+          onProcessPending={() => void repairOrderService.processPendingROImages()}
+          onOpenRO={repairOrderService.openRepairOrder}
+          onDeleteRO={(id) => void repairOrderService.deleteRepairOrder(id)}
+          onOpenSettings={() => repairOrderService.navigateTo('settings')}
         />
       );
 
@@ -50,19 +57,19 @@ export function AppRoutes({ view }: AppRoutesProps) {
       return (
         <ROView
           ro={currentRO}
-          isProcessingOCR={ocr.isProcessingOCR}
-          ocrProgress={ocr.ocrProgress}
-          onDone={ro.done}
-          onUpdateRONumber={ro.updateRONumber}
-          onUpdateVehicle={(field, value) => ro.updateVehicle({ [field]: value })}
-          onUpdateCustomer={ro.updateCustomer}
-          onAddComplaint={ro.addComplaint}
-          onEditComplaint={ro.editComplaint}
-          onRemoveComplaint={ro.removeComplaint}
-          onAddROXentryPhotos={ro.addROXentryPhotos}
-          onAddRepairLine={ro.addRepairLine}
-          onOpenLine={ro.openLine}
-          onDeleteRO={() => ro.deleteRO(currentRO.id)}
+          isProcessingOCR={isProcessingOCR}
+          ocrProgress={ocrProgress}
+          onDone={() => repairOrderService.navigateTo('home')}
+          onUpdateRONumber={repairOrderService.updateRONumber}
+          onUpdateVehicle={(field, value) => repairOrderService.updateVehicle({ [field]: value })}
+          onUpdateCustomer={repairOrderService.updateCustomer}
+          onAddComplaint={repairOrderService.addComplaint}
+          onEditComplaint={repairOrderService.editComplaint}
+          onRemoveComplaint={repairOrderService.removeComplaint}
+          onAddROXentryPhotos={repairOrderService.addROXentryPhotos}
+          onAddRepairLine={repairOrderService.addRepairLine}
+          onOpenLine={(lineId) => repairOrderService.navigateTo('line', lineId)}
+          onDeleteRO={() => void repairOrderService.deleteRepairOrder(currentRO.id)}
         />
       );
 
@@ -72,29 +79,31 @@ export function AppRoutes({ view }: AppRoutesProps) {
         <LineView
           ro={currentRO}
           line={currentLine}
-          isProcessingOCR={ocr.isProcessingOCR}
-          ocrProgress={ocr.ocrProgress}
-          isGenerating={story.isGenerating}
-          isReviewing={story.isReviewing}
+          isProcessingOCR={isProcessingOCR}
+          ocrProgress={ocrProgress}
+          isGenerating={isGenerating}
+          isReviewing={isReviewing}
           hasApiKey={hasApiKey}
           storyQuality={storyQuality}
           storyReview={storyReview}
           storyQualityStale={storyQualityStale}
-          onBack={line.back}
-          onUpdateLine={(updates) => line.updateLine(currentLine.id, updates)}
-          onAddXentryPhotos={() => line.addXentryPhotos(currentLine.id)}
-          onApplySmartDefaults={() => line.applySmartDefaults(currentLine.id)}
+          onBack={() => repairOrderService.navigateTo('ro')}
+          onUpdateLine={(updates) => repairOrderService.updateLine(currentLine.id, updates)}
+          onAddXentryPhotos={() => repairOrderService.addXentryPhotos(currentLine.id)}
+          onApplySmartDefaults={() => repairOrderService.applySmartDefaultsToLine(currentLine.id)}
           onGenerateStory={() => {
-            if (requireApiKey()) line.generateStory(currentLine.id);
+            if (requireApiKey()) void repairOrderService.generateStoryForLine(currentLine.id);
           }}
           onReviewStory={() => {
-            if (requireApiKey()) line.reviewStory(currentLine.id);
+            if (requireApiKey()) void repairOrderService.reviewStoryForLine(currentLine.id);
           }}
         />
       );
 
     case 'settings':
-      return <SettingsView onBack={() => settings.back(!!currentRO)} />;
+      return (
+        <SettingsView onBack={() => repairOrderService.navigateTo(currentRO ? 'ro' : 'home')} />
+      );
 
     default:
       return null;
