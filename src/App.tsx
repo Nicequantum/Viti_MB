@@ -6,13 +6,13 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { LoadingOverlay } from './components/ui/LoadingOverlay';
 import { useAppInit } from './hooks/useAppInit';
 import { useAppView } from './hooks/useAppView';
-import { useLoadingOverlay } from './hooks/useLoadingOverlay';
+import { useLoadingState } from './hooks/useLoadingState';
 import { navigateTo } from './services/repair-order.service';
 
 function App() {
   const hydrated = useAppInit();
   const { view, showHeader } = useAppView();
-  const loadingOverlay = useLoadingOverlay();
+  const { overlay } = useLoadingState();
 
   if (!hydrated) {
     return <AppBootstrap />;
@@ -27,7 +27,7 @@ function App() {
 
         <AppRoutes view={view} />
 
-        <LoadingOverlay {...loadingOverlay} />
+        <LoadingOverlay {...overlay} />
       </div>
     </ErrorBoundary>
   );

@@ -4,11 +4,8 @@ import { HomeView } from '../../features/repair-orders/HomeView';
 import { ROView } from '../../features/repair-orders/ROView';
 import { useActiveLine } from '../../hooks/useActiveLine';
 import { useActiveRepairOrder } from '../../hooks/useActiveRepairOrder';
-import { useLineAuditState } from '../../hooks/useLineAuditState';
-import { useOcrState } from '../../hooks/useOcrState';
-import { useRepairOrderSearch } from '../../hooks/useRepairOrderSearch';
+import { useLoadingState } from '../../hooks/useLoadingState';
 import { useRequireApiKey } from '../../hooks/useRequireApiKey';
-import { useStoryWorkflow } from '../../hooks/useStoryWorkflow';
 import * as repairOrderService from '../../services/repair-order.service';
 import { useAuthStore } from '../../store/authStore';
 import type { AppView } from '../../types';
@@ -21,15 +18,16 @@ export function AppRoutes({ view }: AppRoutesProps) {
   const requireApiKey = useRequireApiKey();
   const hasApiKey = useAuthStore((s) => !!s.apiKey);
 
-  const { isProcessingOCR, ocrProgress } = useOcrState();
-  const { isGenerating, isReviewing } = useStoryWorkflow();
-  const { searchTerm, setSearchTerm, filteredROs } = useRepairOrderSearch();
-  const { currentRO, pendingROImages, setPendingROImages } = useActiveRepairOrder();
-  const currentLine = useActiveLine();
-  const { storyQuality, storyReview, storyQualityStale } = useLineAuditState(
-    currentLine?.id,
-    currentLine?.warrantyStory
-  );
+  const { isProcessingOCR, ocrProgress, isGenerating, isReviewing } = useLoadingState();
+  const {
+    currentRO,
+    pendingROImages,
+    setPendingROImages,
+    searchTerm,
+    setSearchTerm,
+    filteredROs,
+  } = useActiveRepairOrder();
+  const { line: currentLine, storyQuality, storyReview, storyQualityStale } = useActiveLine();
 
   switch (view) {
     case 'home':
